@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<head>
+<style>
+
+#body {
+	margin: 0px;
+}
+
+#debugMenu, #swatchesList {
+	bottom: 0px;
+	display: table;
+	font-family: monospace;
+	font-weight: bold;
+	padding: 30px;
+	position: absolute;
+	table-layout: fixed;
+}
+
+#debugMenu {
+	min-width: 300px;
+	width: 20%;
+}
+
+#swatchesList {
+	float: right;
+	right: 0px;
+}
+
+</style>
+</head>
+
+<body id="body" onload="startGame()">
+<div id="palette"></div>
+<div id="debugMenu"></div>
+<div id="swatchesList"></div>
+
+<script>
+//Variables
+var fps = 60;
+var frameCount = 0;
+var speedDelta = 5;
+var interval;
+var red = new tone(); 
+var green = new tone();
+var blue = new tone();
+var combinedColor;
+var positive = "positive";
+var negative = "negative";
+var white = "#FFFFFF";
+var black = "#000000";
+var fontColor;
+
+//Color cycles every 510 frames
+var colorCycle = 510;
+var swatchCount = 10;
+var swatchFrame = colorCycle / swatchCount;
+var swatchFrameCounter = 0;
+var gapPercent = .10;
+
+//Build Swatches array
+var swatches = new Array(swatchCount);
+for (var i = 0; i < swatches.length; i++) {
+	swatches[i] = new Array(2);
+}
+
+//Build debug menu array. Update in a separate function
+var debugMenuItems = [
+	//["Name", "Text"]
+	["CONTROLS", ""],
+	["Increase FPS", "[+]"],
+	["Decrease FPS", "[-]"],
+	["New Color", "[Space]"],
+	["Toggle Debug", "[D]"],
+	["Toggle Palette", "[P]"],
+	["Toggle Color List", "[L]"],
+	["<br />", ""],
+	["COLOR", ""],
+	["FRAME_COUNT", ""],
+	["FPS", ""],
+	["DRAW_EVERY_(ms)", ""],
+	["SWATCH_COUNT", ""],
+]
+
+//Tone object
+function tone() {
+	this.shade =  getRandomIntInclusive(0, 255);
+	this.direction = getRandomDirection();
+}
+
+//Main game loop
+function startGame() {
+	createSwatches();
+	createDebugMenu();
+	body = document.getElementById("body");
+	interval = setInterval("drawFrame()", 1000 / fps);
+}
+
+//Build divs for each swatch
+function createSwatches() {
+	for (var i = swatchCount - 1; i >= 0; i--) {
+		var paletteChild = document.createElement("div");
+		paletteChild.id = "swatch" + i;
+		paletteChild.style.display = "none"; //Gets set to inline-block
+		paletteChild.style.fontFamily = "monospace";
+		paletteChild.style.fontWeight = "bold";
+		document.getElementById("palette").appendChild(paletteChild);
+	}
+}
+
+function createDebugMenu() {
+	for (var i = 0; i < debugMenuItems.length; i++) {
+		var row = document.createElement("div");
+		row.style.display = "table-row";
+		row.style.width = "100%";
+
+		for (var j = 0; j < debugMenuItems[i].length; j++) {
+			var cell = document.createElement("div");
+			cell.id = debugMenuItems[i][0] + "Div_" + j;
+			cell.style.display = "table-cell";
+			cell.innerHTML = debugMenuItems[i][j];
+			row.appendChild(cell);
+		}
+		
+		document.getElementById("debugMenu").appendChild(row);
+	}
+}
+
+function drawFrame() {
+	red = updateTone(red);
+	green = updateTone(green);
+	blue = updateTone(blue);
+	updateColorString();
+	updateSwatches();
+	
+	//This is be the end of the logic loop
+	updateFrameCount();
+	
+	//These should be very last
+	updateDebugMenu();
+	updateSwatchesList();
+	drawBackground();
+}
+
+function updateFrameCount() {
+	frameCount++;
+	swatchFrameCounter++;
+	if (frameCount >= fps) {
+		frameCount = 0;
+	}
+	if (swatchFrameCounter >= colorCycle) {
+		swatchFrameCounter = 0;
+	}
+}
+
+function updateTone(tone) {
+	//Modifying shade
+	if (tone.direction === "positive") {
+		tone.shade++;
+	}
+	else if (tone.direction === "negative") {
+		tone.shade--;
+	}
+	
+	//Shade out of bounds
+	if (tone.shade >= 255) {
+		tone.shade = 255;
+		tone.direction = "negative";
+	}
+	else if (tone.shade <= 0) {
+		tone.shade = 0;
+		tone.direction = "positive";
+	}
+	
+	return tone;
+}
+
+function updateColorString() {
+	combinedColor = "rgb(" + red.shade + "," + green.shade + "," + blue.shade + ")";
+}
+
+function updateSwatches() {
+	//Rescale each frame
+	var viewWidth = window.innerWidth;
+	var swatchSize = viewWidth / (swatchCount + ((swatchCount + 1) * gapPercent));
+	var gapSize = swatchSize * gapPercent;
+	
+	for (var i = 0; i < swatchCount; i++) {
+		var swatchItem = document.getElementById("swatch" + i);
+		swatchItem.style.width = swatchSize + "px";
+		swatchItem.style.height = swatchSize + "px";
+		swatchItem.style.marginLeft = gapSize + "px";
+		swatchItem.style.marginTop = gapSize + "px";
+	}
+
+	//Update colors on each key frame
+	if (swatchFrameCounter % swatchFrame === 0) {
+		swatches[swatchCount - (swatchFrameCounter / swatchFrame) - 1][0] = combinedColor;
+		swatches[swatchCount - (swatchFrameCounter / swatchFrame) - 1][1] = getFontColor();
+		
+		for (var i = swatches.length - 1; i >= 0; i--) {
+			var swatchItem = document.getElementById("swatch" + i);
+			swatchItem.style.backgroundColor = swatches[i][0];
+			swatchItem.style.color = swatches[i][1];
+			swatchItem.innerHTML = swatches[i][0];
+			
+			//Show if not 'undefined'
+			if (swatches[i][0] !== undefined) {
+				swatchItem.style.display = "inline-block";
+			}
+		}
+	}
+}
+
+function drawBackground() {
+	body.style.backgroundColor = combinedColor;
+}
+
+function updateDebugMenu() {
+	document.getElementById("COLORDiv_1").innerHTML = combinedColor;
+	document.getElementById("FPSDiv_1").innerHTML = fps;
+	document.getElementById("FRAME_COUNTDiv_1").innerHTML = frameCount;
+	document.getElementById("DRAW_EVERY_(ms)Div_1").innerHTML = (1000 / fps).toFixed(3);
+	document.getElementById("SWATCH_COUNTDiv_1").innerHTML = swatchCount;
+	fontColor = getFontColor();
+	document.getElementById("debugMenu").style.color = fontColor;
+}
+
+function updateSwatchesList() {
+	document.getElementById("swatchesList").innerHTML = "";
+	
+	for (var i = swatches.length - 1; i >= 0; i--) {
+		var item = document.createElement("div");
+		item.innerHTML = swatches[i][0];
+		item.style.color = getFontColor();
+		document.getElementById("swatchesList").appendChild(item);
+	}
+}
+
+function flipMenu(menu) {
+	var menuDiv = document.getElementById(menu);
+    if (menuDiv.style.display === "none") {
+        menuDiv.style.display = "table";
+    } else {
+        menuDiv.style.display = "none";
+    }
+}
+
+function getFontColor() {
+	// http://www.nbdtech.com/Blog/archive/2008/04/27/Calculating-the-Perceived-Brightness-of-a-Color.aspx
+
+	var a = 1 - Math.sqrt(.241 * Math.pow(red.shade, 2) + .691 * Math.pow(green.shade, 2) + .068 * Math.pow(blue.shade, 2)) / 255;
+
+	if (a < 0.5)
+	{
+		return black; // bright colors - black font
+	}
+	else
+	{
+		return white; // dark colors - white font
+	}
+}
+			
+function getRandomDirection() {
+	dir = getRandomIntInclusive(0, 1);
+	if (dir) {
+		return "positive";
+	} else {
+		return "negative";
+	}
+}
+
+function getRandomIntInclusive(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+//This isn't a good method. Need to rewrite
+function pad(pad, str, padLeft) {
+  if (typeof str === 'undefined') 
+    return pad;
+  if (padLeft) {
+    return (pad + str).slice(-pad.length);
+  } else {
+    return (str + pad).substring(0, pad.length);
+  }
+}
+
+//Key listeners
+document.onkeydown = function(e) {
+	//[space] gets a new color
+	if (e.keyCode === 32) {
+		red = new tone(); 
+		green = new tone();
+		blue = new tone();
+	}
+	
+	//[+] increases speed
+	if (e.keyCode === 187) {
+		fps += speedDelta;
+		clearInterval(interval);
+		interval = setInterval("drawFrame()", 1000 / fps);
+	}
+
+	//[-] decreases speed
+	if (e.keyCode === 189) {
+		if (fps >= speedDelta) {
+			fps -= speedDelta;
+		}
+		clearInterval(interval);
+		interval = setInterval("drawFrame()", 1000 / fps );
+	}
+	
+	//[d] flips debug
+	if (e.keyCode === 68) {
+		flipMenu("debugMenu");
+	}
+	
+	//[p] flips palette
+	if (e.keyCode === 80) {
+		flipMenu("palette");
+	}
+	
+	//[l] flips swatches list
+	if (e.keyCode === 76) {
+		flipMenu("swatchesList");
+	}
+}
+</script>
+</body>
+</html>
